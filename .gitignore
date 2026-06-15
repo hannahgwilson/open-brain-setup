@@ -6,6 +6,9 @@ supabase/.temp/
 .env.*
 *.key
 
+# Personal — local-only, contains real names/paths
+CLAUDE.md
+
 # OS
 .DS_Store
 
