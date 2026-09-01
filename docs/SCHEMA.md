@@ -257,6 +257,13 @@ The "canonical" tables — defined in this extension's `schema.sql`:
 - **`entities.organization_id`** — Added by this schema. Knowledge-graph bridge analogous to `entities.contact_id` and `entities.location_id`. Populated by the entity-extraction worker when an `entity_type='organization'` matches an `organizations.name`.
 - **Why it exists:** unblocks the job-hunt extension to drop its `companies` table and FK to `organizations` instead, and gives the KG a real join path for org-typed entities.
 
+### tasks schema (shared — `schemas/tasks`)
+
+- **`tasks`** — Canonical fact for actionable to-dos across every domain (job-hunt, family, household, personal…). Generic core (`title`, `status`, `priority` tier `asap|high|normal|low`, `sort_order`, `due_date`, a `domain` discriminator, `kind`, soft `thought_id` bridge, `source`) with **no domain columns** — each extension `ALTER`s in its own nullable FK, the `contacts.organization_id` pattern. A trigger keeps `completed_at` in lockstep with `status`. Generic CRUD RPCs: `task_create` / `task_update` / `task_reorder` / `task_list`.
+- **`task_dismissals`** — Inbox dismiss-memory: unique `(user_id, domain, suggestion_key)` so a dismissed live suggestion never re-surfaces.
+- **Two-layer model with `thoughts`:** `thoughts` (`type='task'` + `workflow-status.status`) is the lightweight *capture* layer; `tasks` is the structured *actionable* layer. Promoting a task-thought sets `tasks.thought_id` and flips the thought's `status` to `'promoted'`.
+- **job-hunt links (`~/repos/job-hunt` migration 016):** `tasks.job_posting_id` / `.application_id` / `.interview_id` / `.contact_id`, plus the smart readers `get_job_checklist` / `get_suggestions` / `promote_suggestion` / `get_interview_prep` in that repo's `functions.sql`.
+
 ## Key FK relationships
 
 ```
@@ -279,6 +286,12 @@ contacts.id ──┬─→ household_details.contact_id (1:1, PK)
 
 organizations.id ─→ contacts.organization_id    [pending]
                  ─→ entities.organization_id    [pending]
+
+tasks (domain='job-hunt') ─┬─→ job_postings.id (tasks.job_posting_id)
+                           ├─→ applications.id (tasks.application_id)
+                           ├─→ interviews.id  (tasks.interview_id)
+                           └─→ contacts.id    (tasks.contact_id)
+tasks.thought_id ─→ thoughts.id                (soft ref, no FK)
 
 pets.id ──────┬─→ pet_walks.pet_id
               └─→ events.pet_id
